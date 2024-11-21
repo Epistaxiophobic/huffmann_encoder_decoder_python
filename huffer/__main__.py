@@ -24,8 +24,22 @@ def build_huffmann_tree(char_freq_lst):
         value += left.value if isinstance(left, Node) else left[1]
         node = Node(right, left, value)
         cfl.append(node)
-        cfl.sort(key=lambda x: x.value if isinstance(x, Node) else x[1])
+        cfl.sort(key=lambda x: x.value if isinstance(x, Node) else x[1], reverse=True)
     return cfl[0]
+
+def create_encoding_table(tree):
+    def traverse_the_tree(node, table, encoding):
+        if not node:
+            return
+        if not isinstance(node, Node):
+            table.append((node[0], encoding))
+            return
+        traverse_the_tree(node.right, table, encoding + "1")
+        traverse_the_tree(node.left, table, encoding + "0")
+
+    table = []
+    traverse_the_tree(tree, table, "")
+    return table
 
 def main():
     # Add command line arguments
@@ -54,6 +68,8 @@ def main():
     char_freq_dict = get_char_freq_dict(data)
     char_freq_lst = [(c, char_freq_dict[c]) for c in sorted(char_freq_dict.keys(), key=lambda x: char_freq_dict[x], reverse=True)]
     huff_tree = build_huffmann_tree(char_freq_lst)
-    
+    # Create encoding table     
+    char_encoding_lst = create_encoding_table(huff_tree)
+
 if __name__ == "__main__":
     main()
