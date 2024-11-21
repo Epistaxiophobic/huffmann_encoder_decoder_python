@@ -32,36 +32,30 @@ def create_encoding_table(tree):
         if not node:
             return
         if not isinstance(node, Node):
-            table.append((node[0], encoding))
+            table[node[0]] = encoding
             return
         traverse_the_tree(node.right, table, encoding + "1")
         traverse_the_tree(node.left, table, encoding + "0")
 
-    table = []
+    table = {}
     traverse_the_tree(tree, table, "")
     return table
 
-def main():
-    # Add command line arguments
-    parser = argparse.ArgumentParser(description="A huffmann encoder decoder written in python")
-    parser.add_argument("MDOE", type=str, help="the operation mode of the program, e for encode / d for decode")
-    parser.add_argument("FILE", type=str, nargs="?", help="if FILE is - or no file is specified read standard input")
-    args = parser.parse_args()
-
+def encode(path):
     data = ""
 
-    if args.FILE is None or args.FILE == "-":
+    if path is None or path == "-":
         data = stdin.read()
     else:
         # Check file validity
-        if not exists(args.FILE):
-            print(f"No such file or directory: {args.FILE}")
+        if not exists(path):
+            print(f"No such file or directory: {path}")
             quit()
-        if not isfile(args.FILE):
-            print(f"{args.FILE}: is not a file")
+        if not isfile(path):
+            print(f"{path}: is not a file")
             quit()
         # Read file
-        with open(args.FILE, "r") as fh:
+        with open(path, "r") as fh:
             for line in fh:
                 data += line
     # Build Huffmann tree    
@@ -70,6 +64,41 @@ def main():
     huff_tree = build_huffmann_tree(char_freq_lst)
     # Create encoding table     
     char_encoding_lst = create_encoding_table(huff_tree)
+    # Encode the data
+    res = ""
+    for c in data:
+        res += char_encoding_lst[c]
+    # Get file name
+    out_name = ""
+    while len(out_name) == 0:
+        out_name = input("type a name for the output file name: ")
+    
+    # Create header
+    header = f"{len(char_freq_lst)}"
+    for x in char_freq_lst:
+        header += f"{x[0]}\0{x[1]}\0"
+
+    with open(out_name, "wb") as fh:
+        fh.write(bytes(header, encoding="utf-8"))
+        i = 0
+        while i < len(res):
+            curr = res[i:i + 8]
+            while len(curr) < 8:
+                curr += "0"
+            i += 8
+            fh.write(int(curr, 2).to_bytes(1, byteorder="big"))
+
+def main():
+    # Add command line arguments
+    parser = argparse.ArgumentParser(description="A huffmann encoder decoder written in python")
+    parser.add_argument("MODE", type=str, help="the operation mode of the program, e for encode / d for decode")
+    parser.add_argument("FILE", type=str, nargs="?", help="if FILE is - or no file is specified read standard input")
+    args = parser.parse_args()
+    
+    if args.MODE == "e":
+        encode(args.FILE)
+    else:
+        print(f"Invalid MODE: {args.MODE}")
 
 if __name__ == "__main__":
     main()
