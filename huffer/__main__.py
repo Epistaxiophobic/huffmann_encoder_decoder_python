@@ -63,31 +63,36 @@ def encode(path):
     char_freq_lst = [(c, char_freq_dict[c]) for c in sorted(char_freq_dict.keys(), key=lambda x: char_freq_dict[x], reverse=True)]
     huff_tree = build_huffmann_tree(char_freq_lst)
     # Create encoding table     
-    char_encoding_lst = create_encoding_table(huff_tree)
+    char_encoding_dict = create_encoding_table(huff_tree)
     # Encode the data
     res = ""
     for c in data:
-        res += char_encoding_lst[c]
+        res += char_encoding_dict[c]
     # Get file name
     out_name = ""
     while len(out_name) == 0:
         out_name = input("type a name for the output file name: ")
-    
-    # Create header
-    header = f"{len(char_freq_lst)}"
-    for x in char_freq_lst:
-        header += f"{x[0]}\0{x[1]}\0"
+    #TODO: DO SOMETHING
 
-    with open(out_name, "wb") as fh:
-        fh.write(bytes(header, encoding="utf-8"))
-        i = 0
-        while i < len(res):
-            curr = res[i:i + 8]
-            while len(curr) < 8:
-                curr += "0"
-            i += 8
-            fh.write(int(curr, 2).to_bytes(1, byteorder="big"))
+def decode(path):
+    if path is None or path == "-":
+        print(f"Invalid path: {path}")
+        quit()
+    # Check file validity
+    if not exists(path):
+        print(f"No such file or directory: {path}")
+        quit()
+    if not isfile(path):
+        print(f"{path}: is not a file")
+        quit()
+    # Create huffmann tree
+    char_freq_dict = {}
 
+    with open(path, "rb") as fh:
+        if not int.from_bytes(fh.read(4)) == 9731:
+            print(f"Invalid file: {path}")
+    #TODO: DO SOMETHING
+        
 def main():
     # Add command line arguments
     parser = argparse.ArgumentParser(description="A huffmann encoder decoder written in python")
@@ -97,6 +102,8 @@ def main():
     
     if args.MODE == "e":
         encode(args.FILE)
+    elif args.MODE == "d":
+        decode(args.FILE)
     else:
         print(f"Invalid MODE: {args.MODE}")
 
