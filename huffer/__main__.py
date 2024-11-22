@@ -1,6 +1,4 @@
 import argparse
-from os.path import exists, isfile
-from sys import stdin
 
 def get_char_freq_dict(s):
     res = {}
@@ -61,23 +59,42 @@ def decode_vli(data):
         
         return value
 
+def is_file(path):
+    from os.path import exists, isfile
+    if not exists(path):
+        print(f"No such file or directory: {path}")
+        return False
+    if not isfile(path):
+        print(f"{path}: is not a file")
+        return False
+    return True
+
+def get_output_file_name():
+    from os.path import exists
+    # Get file name
+    out_name = ""
+    while len(out_name) == 0:
+        out_name = input("type a name for the output file name: ")
+        if out_name != "" and exists(out_name):
+            choice = input(f"{out_name} already exists, overwrite? (y/n/q): ")
+            if choice.lower() == "q":
+                return ""
+            if choice.lower() != "y":
+                out_name = ""
+    return out_name
+
 def encode(path):
+    from sys import stdin
     data = ""
 
     if path is None or path == "-":
         data = stdin.read()
-    else:
-        # Check file validity
-        if not exists(path):
-            print(f"No such file or directory: {path}")
-            quit()
-        if not isfile(path):
-            print(f"{path}: is not a file")
-            quit()
-        # Read file
-        with open(path, "r") as fh:
-            for line in fh:
-                data += line
+    elif not is_file(path):
+        quit()
+    # Read file
+    with open(path, "r") as fh:
+        for line in fh:
+            data += line
     # Build Huffmann tree    
     char_freq_dict = get_char_freq_dict(data)
     char_freq_lst = [(c, char_freq_dict[c]) for c in sorted(char_freq_dict.keys(), key=lambda x: char_freq_dict[x], reverse=True)]
@@ -88,10 +105,10 @@ def encode(path):
     res = ""
     for c in data:
         res += char_encoding_dict[c]
-    # Get file name
-    out_name = ""
-    while len(out_name) == 0:
-        out_name = input("type a name for the output file name: ")
+   
+    out_name = get_output_file_name()
+    if out_name == "":
+        quit()
     
     with open(out_name, "wb") as fh:
         # Write header
@@ -111,77 +128,67 @@ def encode(path):
             fh.write(int(curr, 2).to_bytes(1))
             i += 8
 
+def read_vli(data):
+    byte_count = 0
+    bytez = bytearray()
+    
+    while data[byte_count] & 0x80 != 0:
+        bytez.append(data[byte_count])
+        byte_count += 1
+    bytez.append(data[byte_count])
+    byte_count += 1
+
+    return (bytez, byte_count)
+
 def decode(path):
     if path is None or path == "-":
-        print(f"Invalid path: {path}")
+        print(f"Invalid input: {path}")
         quit()
-    # Check file validity
-    if not exists(path):
-        print(f"No such file or directory: {path}")
+    elif not is_file(path):
         quit()
-    if not isfile(path):
-        print(f"{path}: is not a file")
-        quit()
-    # Create huffmann tree
-    char_freq_dict = {}
-
+    
     with open(path, "rb") as fh:
-        # Verify file
-        bytez = bytearray()
         data = fh.read()
         i = 0
-        bytez = bytearray()
-        while data[i] & 0x80 != 0:
-            bytez.append(data[i])
-            i += 1
-        bytez.append(data[i])
-        i += 1
-        # Get header length
-        if decode_vli(bytez) != 9731:
+        # Verify file
+        header_byte_data = read_vli(data[i:])
+        i += header_byte_data[1]
+        if decode_vli(header_byte_data[0]) != 9731:
             print(f"Invalid file: {path}")
             quit()
-        bytez = bytearray()
-        while data[i] & 0x80 != 0:
-            bytez.append(data[i])
-            i += 1
-        bytez.append(data[i])
-        i += 1
-        length = decode_vli(bytez)
-        bytez = bytearray()
+        # Get header length
+        length_byte_data = read_vli(data[i:])
+        i += length_byte_data[1]
+        length = decode_vli(length_byte_data[0])
         # Create character frequency list
         char_freq_lst = []
         for e in range(length):
-            while data[i] & 0x80 != 0:
-                bytez.append(data[i])
-                i += 1
-            bytez.append(data[i])
-            i += 1
-            char = chr(decode_vli(bytez))
-            bytez = bytearray()
-            
-            while data[i] & 0x80 != 0:
-                bytez.append(data[i])
-                i += 1
-            bytez.append(data[i])
-            i += 1
-            freq = decode_vli(bytez)
-            bytez = bytearray()
+            # Read character
+            char_byte_data = read_vli(data[i:])
+            i += char_byte_data[1]
+            char = chr(decode_vli(char_byte_data[0]))
+            # Read Frequency
+            freq_byte_data = read_vli(data[i:])
+            i += freq_byte_data[1]
+            freq = decode_vli(freq_byte_data[0])
+            # Add to list
             char_freq_lst.append((char, freq))
+        
         # Create tree
         huff_tree = build_huffmann_tree(char_freq_lst)
         # Create encoding table     
         char_encoding_dict = create_encoding_table(huff_tree)
         char_encoding_dict = {v: k for k, v in char_encoding_dict.items()}
+        
         # Read body
-        while data[i] & 0x80 != 0:
-            bytez.append(data[i])
-            i += 1
-        bytez.append(data[i])
-        i += 1
-        body_length = decode_vli(bytez)
+        body_length_byte_data = read_vli(data[i:])
+        i += body_length_byte_data[1]
+        body_length = decode_vli(body_length_byte_data[0])
+        
         encoded = ""
         for n in data[i:]:
             encoded += format(n, "08b")
+        
         # Decode
         res = ""
         curr = ""
@@ -191,11 +198,10 @@ def decode(path):
             if decoded is not None:
                 res += decoded
                 curr = ""
-    # Get file name
-    out_name = ""
-    while len(out_name) == 0:
-        out_name = input("type a name for the output file name: ")
-
+    
+    out_name = get_output_file_name()
+    if out_name == "":
+        quit()
     with open(out_name, "w") as fh:
         fh.write(res)
 
