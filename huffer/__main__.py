@@ -191,7 +191,13 @@ def decode(path):
             if decoded is not None:
                 res += decoded
                 curr = ""
-        print(res)
+    # Get file name
+    out_name = ""
+    while len(out_name) == 0:
+        out_name = input("type a name for the output file name: ")
+
+    with open(out_name, "w") as fh:
+        fh.write(res)
 
 def main():
     # Add command line arguments
